@@ -1,62 +1,10 @@
--- ESP ONLY (NO TEAM CHECK)
+-- ESP ONLY (ALWAYS ON, NO GUI)
 assert(Drawing, "Your exploit does not support Drawing API")
-
-local TAG_NAME = "ESPOnlyScriptTag"
-
--- Remove previous GUI
-for _, gui in pairs(game.CoreGui:GetChildren()) do
-    if gui:IsA("ScreenGui") and gui:FindFirstChild(TAG_NAME) then
-        gui:Destroy()
-    end
-end
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-
-local COLOR_ON = Color3.fromRGB(55, 177, 99)
-local COLOR_OFF = Color3.fromRGB(177, 44, 44)
-
--- STATES
-local espEnabled = true
-
--- GUI
-local screenGui = Instance.new("ScreenGui", game.CoreGui)
-screenGui.Name = "ESP_GUI"
-
-local tag = Instance.new("BoolValue", screenGui)
-tag.Name = TAG_NAME
-tag.Value = true
-
-local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 120, 0, 50)
-frame.Position = UDim2.new(0.3, 0, 0.1, 0)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.Active = true
-frame.Draggable = true
-frame.BorderSizePixel = 0
-
-local function createButton(text, pos, initial, callback)
-    local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(0, 100, 0, 25)
-    btn.Position = pos
-    btn.Text = text
-    btn.BackgroundColor3 = initial and COLOR_ON or COLOR_OFF
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 14
-
-    btn.MouseButton1Click:Connect(function()
-        initial = not initial
-        btn.BackgroundColor3 = initial and COLOR_ON or COLOR_OFF
-        callback(initial)
-    end)
-end
-
-createButton("ESP", UDim2.new(0,10,0,10), espEnabled, function(v)
-    espEnabled = v
-end)
 
 -- ESP STORAGE
 local ESP = {}
@@ -120,7 +68,7 @@ end
 Players.PlayerAdded:Connect(createESP)
 Players.PlayerRemoving:Connect(removeESP)
 
--- ESP LOOP
+-- ESP LOOP (ALWAYS ON)
 RunService.RenderStepped:Connect(function()
     for player, data in pairs(ESP) do
         local char = player.Character
@@ -128,7 +76,7 @@ RunService.RenderStepped:Connect(function()
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         local head = char and char:FindFirstChild("Head")
 
-        if espEnabled and hrp and head and hum and hum.Health > 0 then
+        if hrp and head and hum and hum.Health > 0 then
             local pos, visible = Camera:WorldToViewportPoint(hrp.Position)
             local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
             local bottom = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
@@ -136,7 +84,8 @@ RunService.RenderStepped:Connect(function()
             local height = math.abs(top.Y - bottom.Y)
             local width = height / 2
 
-            local color = player.TeamColor.Color
+            -- FIXED COLOR (RED)
+            local color = Color3.fromRGB(255, 0, 0)
 
             if visible then
                 data.name.Text = player.Name
@@ -165,4 +114,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("ESP Loaded (No Team Check)")
+print("ESP Loaded (Always On, No GUI)")
