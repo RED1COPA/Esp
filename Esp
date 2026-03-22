@@ -1,10 +1,26 @@
--- ESP ONLY (ALWAYS ON, NO GUI)
+-- ESP ONLY (NO TEAM CHECK)
 assert(Drawing, "Your exploit does not support Drawing API")
+
+local TAG_NAME = "ESPOnlyScriptTag"
+
+-- Remove previous GUI
+for _, gui in pairs(game.CoreGui:GetChildren()) do
+    if gui:IsA("ScreenGui") and gui:FindFirstChild(TAG_NAME) then
+        gui:Destroy()
+    end
+end
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
+
+local COLOR_ON = Color3.fromRGB(55, 177, 99)
+local COLOR_OFF = Color3.fromRGB(177, 44, 44)
+
+-- STATES
+local espEnabled = true
+
 
 -- ESP STORAGE
 local ESP = {}
@@ -46,6 +62,74 @@ local function createESP(player)
 
     player.CharacterAdded:Connect(function(char)
         highlight.Adornee = char
+    end)
+end
+
+local function removeESP(player)
+    local data = ESP[player]
+    if not data then return end
+
+    pcall(function() data.name:Remove() end)
+    pcall(function() data.box:Remove() end)
+    if data.highlight then data.highlight:Destroy() end
+
+    ESP[player] = nil
+end
+
+-- Init
+for _, p in ipairs(Players:GetPlayers()) do
+    createESP(p)
+end
+
+Players.PlayerAdded:Connect(createESP)
+Players.PlayerRemoving:Connect(removeESP)
+
+-- ESP LOOP
+RunService.RenderStepped:Connect(function()
+    for player, data in pairs(ESP) do
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local head = char and char:FindFirstChild("Head")
+
+        if espEnabled and hrp and head and hum and hum.Health > 0 then
+            local pos, visible = Camera:WorldToViewportPoint(hrp.Position)
+            local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+            local bottom = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+
+            local height = math.abs(top.Y - bottom.Y)
+            local width = height / 2
+
+            local color = player.TeamColor.Color
+
+            if visible then
+                data.name.Text = player.Name
+                data.name.Position = Vector2.new(pos.X, top.Y - 16)
+                data.name.Color = color
+                data.name.Visible = true
+
+                data.box.Position = Vector2.new(pos.X - width/2, top.Y)
+                data.box.Size = Vector2.new(width, height)
+                data.box.Color = color
+                data.box.Visible = true
+
+                data.highlight.FillColor = color
+                data.highlight.OutlineColor = color
+                data.highlight.Enabled = true
+            else
+                data.name.Visible = false
+                data.box.Visible = false
+                data.highlight.Enabled = false
+            end
+        else
+            data.name.Visible = false
+            data.box.Visible = false
+            data.highlight.Enabled = false
+        end
+    end
+end)
+
+print("ESP Loaded (No Team Check)")        highlight.Adornee = char
     end)
 end
 
