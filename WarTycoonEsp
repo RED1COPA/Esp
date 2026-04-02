@@ -83,7 +83,7 @@ end
 -- 🔁 Main loop
 RunService.RenderStepped:Connect(function()
 
-
+local activePlayers = {}
 local char = LocalPlayer.Character
 local hum = char and char:FindFirstChildOfClass("Humanoid")
 
@@ -96,6 +96,7 @@ end
     -- =====================
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
+          activePlayers[player] = true
 
             if not ESP[player] then
                 ESP[player] = createESP()
@@ -182,7 +183,18 @@ end
     end
 
 
-
+-- =====================
+-- CLEANUP (REMOVE OLD PLAYERS)
+-- =====================
+for obj, e in pairs(ESP) do
+    if typeof(obj) == "Instance" and obj:IsA("Player") then
+        if not activePlayers[obj] or not obj.Parent then
+            hideESP(e)
+            e.highlight:Destroy()
+            ESP[obj] = nil
+        end
+    end
+end
 
 
 -- =====================
