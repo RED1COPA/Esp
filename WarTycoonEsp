@@ -232,10 +232,16 @@ for _, folderName in ipairs(VEHICLE_FOLDERS) do
             local primary = vehicle.PrimaryPart or vehicle:FindFirstChildWhichIsA("BasePart")
             local healthObj = vehicle:FindFirstChild("Health")
             local maxHealthObj = vehicle:FindFirstChild("MaxHealth")
+            local isDrone = vehicle:IsDescendantOf(GAME_SYSTEMS:FindFirstChild("Drone Workspace"))
 
             if not primary or not healthObj or not maxHealthObj or healthObj.Value <= 0 then
                 hideESP(e)
                 continue
+            end
+
+            if not isDrone and (not healthObj or not maxHealthObj or healthObj.Value <= 0) then
+             hideESP(e)
+             continue
             end
 
             local pos, visible = Camera:WorldToViewportPoint(primary.Position)
