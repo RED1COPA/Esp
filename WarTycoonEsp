@@ -1,0 +1,261 @@
+-- ESP (Players + Vehicles)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local ESP = {}
+
+-- Vehicle folders
+local GAME_SYSTEMS = workspace:WaitForChild("Game Systems")
+local VEHICLE_FOLDERS = {
+    "Boat Workspace",
+    "Drone Workspace",
+    "Gunship Workspace",
+    "Helicopter Workspace",
+    "Hovercraft Workspace",
+    "Plane Workspace",
+    "Submarine Workspace",
+    "Tank Workspace",
+    "Vehicle Workspace"
+}
+
+-- 🔧 Health → Color (green to red)
+local function getHealthColor(percent)
+    return Color3.fromRGB(
+        255 * (1 - percent),
+        255 * percent,
+        0
+    )
+end
+
+-- 🔧 Create ESP object
+local function createESP()
+    local name = Drawing.new("Text")
+    name.Size = 14
+    name.Center = true
+    name.Outline = true
+    name.Font = 2
+    name.Visible = false
+
+    local tool = Drawing.new("Text")
+    tool.Size = 13
+    tool.Center = true
+    tool.Outline = true
+    tool.Font = 2
+    tool.Visible = false
+
+    local box = Drawing.new("Square")
+    box.Thickness = 1.5
+    box.Filled = false
+    box.Visible = false
+
+    local healthBar = Drawing.new("Square")
+    healthBar.Filled = true
+    healthBar.Thickness = 0
+    healthBar.Visible = false
+
+    local highlight = Instance.new("Highlight")
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Enabled = false
+    pcall(function() highlight.Parent = game.CoreGui end)
+
+    return {
+        name = name,
+        tool = tool,
+        box = box,
+        healthBar = healthBar,
+        highlight = highlight
+    }
+end
+
+-- 🔧 Hide ESP
+local function hideESP(e)
+    e.name.Visible = false
+    e.tool.Visible = false
+    e.box.Visible = false
+    e.healthBar.Visible = false
+    e.highlight.Enabled = false
+end
+
+-- 🔁 Main loop
+RunService.RenderStepped:Connect(function()
+
+    -- =====================
+    -- PLAYERS
+    -- =====================
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+
+            if not ESP[player] then
+                ESP[player] = createESP()
+            end
+
+            local e = ESP[player]
+
+            local char = player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local head = char and char:FindFirstChild("Head")
+
+            if not char or not hum or hum.Health <= 0 or not hrp or not head then
+                hideESP(e)
+                continue
+            end
+
+            local pos, visible = Camera:WorldToViewportPoint(hrp.Position)
+            if not visible then
+                hideESP(e)
+                continue
+            end
+
+            local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+            local bottom = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+
+            local height = math.abs(top.Y - bottom.Y)
+            local width = height / 2
+
+            local healthPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            local healthColor = getHealthColor(healthPercent)
+
+            -- Tool detection
+            local toolName = ""
+            for _, v in ipairs(char:GetChildren()) do
+                if v:IsA("Tool") then
+                    toolName = v.Name
+                    break
+                end
+            end
+
+            local color = player.TeamColor.Color
+
+            -- NAME
+            e.name.Text = player.Name
+            e.name.Position = Vector2.new(pos.X, top.Y - 16)
+            e.name.Color = color
+            e.name.Visible = true
+
+            -- TOOL
+            if toolName ~= "" then
+                e.tool.Text = toolName
+                e.tool.Position = Vector2.new(pos.X, bottom.Y + 2)
+                e.tool.Color = color
+                e.tool.Visible = true
+            else
+                e.tool.Visible = false
+            end
+
+            -- BOX
+            e.box.Position = Vector2.new(pos.X - width / 2, top.Y)
+            e.box.Size = Vector2.new(width, height)
+            e.box.Color = color
+            e.box.Visible = true
+
+            -- HEALTH BAR (right side)
+            local barWidth = 3
+            local barHeight = height * healthPercent
+
+            e.healthBar.Size = Vector2.new(barWidth, barHeight)
+            e.healthBar.Position = Vector2.new(
+                pos.X + width / 2 + 2,
+                top.Y + (height - barHeight)
+            )
+            e.healthBar.Color = healthColor
+            e.healthBar.Visible = true
+
+            -- HIGHLIGHT
+            e.highlight.FillColor = color
+            e.highlight.OutlineColor = color
+            e.highlight.Adornee = char
+            e.highlight.Enabled = true
+        end
+    end
+
+
+
+
+
+-- =====================
+-- VEHICLES (ACCURATE SIZE)
+-- =====================
+for _, folderName in ipairs(VEHICLE_FOLDERS) do
+    local folder = GAME_SYSTEMS:FindFirstChild(folderName)
+    if folder then
+        for _, vehicle in ipairs(folder:GetChildren()) do
+
+            if not ESP[vehicle] then
+                ESP[vehicle] = createESP()
+            end
+
+            local e = ESP[vehicle]
+
+            local primary = vehicle.PrimaryPart or vehicle:FindFirstChildWhichIsA("BasePart")
+            local healthObj = vehicle:FindFirstChild("Health")
+            local maxHealthObj = vehicle:FindFirstChild("MaxHealth")
+
+            if not primary or not healthObj or not maxHealthObj or healthObj.Value <= 0 then
+                hideESP(e)
+                continue
+            end
+
+            local pos, visible = Camera:WorldToViewportPoint(primary.Position)
+            if not visible then
+                hideESP(e)
+                continue
+            end
+
+            -- ✅ REAL SIZE (like players, but using full model)
+            local cf, size = vehicle:GetBoundingBox()
+
+            local topWorld = cf.Position + Vector3.new(0, size.Y / 2, 0)
+            local bottomWorld = cf.Position - Vector3.new(0, size.Y / 2, 0)
+
+            local top = Camera:WorldToViewportPoint(topWorld)
+            local bottom = Camera:WorldToViewportPoint(bottomWorld)
+
+            local height = math.abs(top.Y - bottom.Y)
+            local width = height * (size.X / size.Y)
+
+            -- Health
+            local healthPercent = math.clamp(healthObj.Value / maxHealthObj.Value, 0, 1)
+            local healthColor = getHealthColor(healthPercent)
+
+            local color = Color3.fromRGB(200, 200, 200) -- light gray
+
+            -- NAME
+            e.name.Text = vehicle.Name
+            e.name.Position = Vector2.new(pos.X, top.Y + height + 2)
+            e.name.Color = color
+            e.name.Visible = true
+
+            -- BOX (now accurate)
+            e.box.Position = Vector2.new(pos.X - width / 2, top.Y)
+            e.box.Size = Vector2.new(width, height)
+            e.box.Color = color
+            e.box.Visible = true
+
+            -- HEALTH BAR (right side, matches box)
+            local barWidth = 3
+            local barHeight = height * healthPercent
+
+            e.healthBar.Size = Vector2.new(barWidth, barHeight)
+            e.healthBar.Position = Vector2.new(
+                pos.X + width / 2 + 2,
+                top.Y + (height - barHeight)
+            )
+            e.healthBar.Color = healthColor
+            e.healthBar.Visible = true
+
+            -- NO TOOL TEXT
+            e.tool.Visible = false
+
+            -- HIGHLIGHT
+            e.highlight.FillColor = color
+            e.highlight.OutlineColor = color
+            e.highlight.Adornee = vehicle
+            e.highlight.Enabled = true
+        end
+    end
+end
+end)
