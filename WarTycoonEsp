@@ -79,8 +79,17 @@ local function hideESP(e)
     e.highlight.Enabled = false
 end
 
+
 -- 🔁 Main loop
 RunService.RenderStepped:Connect(function()
+
+
+local char = LocalPlayer.Character
+local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+if hum and hum.SeatPart then
+    myVehicle = hum.SeatPart:FindFirstAncestorOfClass("Model")
+end
 
     -- =====================
     -- PLAYERS
@@ -177,18 +186,36 @@ RunService.RenderStepped:Connect(function()
 
 
 -- =====================
--- VEHICLES (ACCURATE SIZE)
+-- VEHICLES (TRACKED CLEANLY)
 -- =====================
+local activeVehicles = {}
+
 for _, folderName in ipairs(VEHICLE_FOLDERS) do
     local folder = GAME_SYSTEMS:FindFirstChild(folderName)
     if folder then
         for _, vehicle in ipairs(folder:GetChildren()) do
+          
+         if vehicle == myVehicle then
+        if ESP[vehicle] then
+            hideESP(ESP[vehicle])
+        end
+        continue
+    end
+
+            activeVehicles[vehicle] = true -- ✅ mark as valid THIS frame
 
             if not ESP[vehicle] then
                 ESP[vehicle] = createESP()
             end
 
             local e = ESP[vehicle]
+
+            -- Safety check
+            if not vehicle or not vehicle.Parent then
+                hideESP(e)
+                ESP[vehicle] = nil
+                continue
+            end
 
             local primary = vehicle.PrimaryPart or vehicle:FindFirstChildWhichIsA("BasePart")
             local healthObj = vehicle:FindFirstChild("Health")
@@ -205,8 +232,15 @@ for _, folderName in ipairs(VEHICLE_FOLDERS) do
                 continue
             end
 
-            -- ✅ REAL SIZE (like players, but using full model)
-            local cf, size = vehicle:GetBoundingBox()
+            -- Safe bounding box
+            local success, cf, size = pcall(function()
+                return vehicle:GetBoundingBox()
+            end)
+
+            if not success or not cf or not size then
+                hideESP(e)
+                continue
+            end
 
             local topWorld = cf.Position + Vector3.new(0, size.Y / 2, 0)
             local bottomWorld = cf.Position - Vector3.new(0, size.Y / 2, 0)
@@ -221,21 +255,21 @@ for _, folderName in ipairs(VEHICLE_FOLDERS) do
             local healthPercent = math.clamp(healthObj.Value / maxHealthObj.Value, 0, 1)
             local healthColor = getHealthColor(healthPercent)
 
-            local color = Color3.fromRGB(200, 200, 200) -- light gray
+            local color = Color3.fromRGB(200, 200, 200)
 
-            -- NAME
+            -- NAME (under box)
             e.name.Text = vehicle.Name
             e.name.Position = Vector2.new(pos.X, top.Y + height + 2)
             e.name.Color = color
             e.name.Visible = true
 
-            -- BOX (now accurate)
+            -- BOX
             e.box.Position = Vector2.new(pos.X - width / 2, top.Y)
             e.box.Size = Vector2.new(width, height)
             e.box.Color = color
             e.box.Visible = true
 
-            -- HEALTH BAR (right side, matches box)
+            -- HEALTH BAR
             local barWidth = 3
             local barHeight = height * healthPercent
 
@@ -247,7 +281,7 @@ for _, folderName in ipairs(VEHICLE_FOLDERS) do
             e.healthBar.Color = healthColor
             e.healthBar.Visible = true
 
-            -- NO TOOL TEXT
+            -- NO TOOL
             e.tool.Visible = false
 
             -- HIGHLIGHT
@@ -255,6 +289,19 @@ for _, folderName in ipairs(VEHICLE_FOLDERS) do
             e.highlight.OutlineColor = color
             e.highlight.Adornee = vehicle
             e.highlight.Enabled = true
+        end
+    end
+end
+
+-- =====================
+-- CLEANUP (REMOVE OLD VEHICLES)
+-- =====================
+for obj, e in pairs(ESP) do
+    if typeof(obj) == "Instance" and obj:IsA("Model") then
+        if not activeVehicles[obj] then
+            hideESP(e)
+            e.highlight:Destroy()
+            ESP[obj] = nil
         end
     end
 end
